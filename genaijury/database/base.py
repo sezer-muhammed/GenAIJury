@@ -7,6 +7,15 @@ class DatabaseInterface(ABC):
     """
 
     @abstractmethod
+    def get_unique_names(self):
+        """
+        Retrieves a list of all unique "Name" values from the database.
+
+        :return: A list of unique "Name" values.
+        """
+        pass
+
+    @abstractmethod
     def connect(self):
         """
         Establish a connection to the database.

@@ -8,6 +8,15 @@ class JSONFileInterface(DatabaseInterface):
         self.filepath = filepath
         self.connect()
 
+    def get_unique_names(self) -> List[str]:
+        documents = self._read_file()
+        unique_names = set()
+        for doc in documents:
+            name = doc["Name"]
+            unique_names.add(name)
+
+        return list(unique_names)
+
     def connect(self):
         # Ensure the file exists
         if not os.path.exists(self.filepath):

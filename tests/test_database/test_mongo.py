@@ -47,3 +47,18 @@ def test_delete(mongo_interface):
     query = {"Name": "Test Entity"}
     deleted_count = mongo_interface.delete(query)
     assert deleted_count > 0
+
+def test_get_unique_names_multiple(mongo_interface):
+    # Test for multiple unique names in the JSON file
+    documents = [
+        {"Name": "Name 1"},
+        {"Name": "Name 2"},
+        {"Name": "Name 3"},
+        {"Name": "Name 1"},  # Repeat Name 1
+        {"Name": "Name 4"},
+        {"Name": "Test Entity", "Criterias": {"Criteria1": 100, "Criteria2": 90}}
+    ]
+    for doc in documents:
+        mongo_interface.create(doc)
+    expected_unique_names = ["Name 1", "Name 2", "Name 3", "Name 4", "Test Entity"]
+    assert sorted(mongo_interface.get_unique_names()) == sorted(expected_unique_names)

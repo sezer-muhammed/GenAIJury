@@ -34,3 +34,18 @@ def test_delete(json_interface):
     query = {"Name": "Test Entity"}
     deleted_count = json_interface.delete(query)
     assert deleted_count > 0
+
+def test_get_unique_names_multiple(json_interface):
+    # Test for multiple unique names in the JSON file
+    documents = [
+        {"Name": "Name 1"},
+        {"Name": "Name 2"},
+        {"Name": "Name 3"},
+        {"Name": "Name 1"},  # Repeat Name 1
+        {"Name": "Name 4"},
+        {"Name": "Test Entity", "Criterias": {"Criteria1": 100, "Criteria2": 90}}
+    ]
+    for doc in documents:
+        json_interface.create(doc)
+    expected_unique_names = ["Name 1", "Name 2", "Name 3", "Name 4", "Test Entity"]
+    assert sorted(json_interface.get_unique_names()) == sorted(expected_unique_names)

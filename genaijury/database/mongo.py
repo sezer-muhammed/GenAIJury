@@ -9,6 +9,9 @@ class MongoDBInterface(DatabaseInterface):
         self.collection: Collection = self.database[collection_name]
         self.connect()
 
+    def get_unique_names(self):
+        return self.collection.distinct("Name")
+
     def connect(self):
         # Connection is established in the constructor.
         pass
