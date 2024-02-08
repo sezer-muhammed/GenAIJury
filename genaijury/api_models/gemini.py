@@ -13,6 +13,24 @@ class GeminiAPIModel(APIModel):
             "top_k": 32,
             "max_output_tokens": 16000,
         }
+        self.safety_settings = [
+        {
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        ]
 
 
     def configure(self, api_key: str, **config):
@@ -26,18 +44,24 @@ class GeminiAPIModel(APIModel):
             if 'safety_settings' in config:
                 self.safety_settings = config['safety_settings']
 
+        return self
+
+    def call(self, text_prompt: str, image_paths: list[str] = []) -> str:
+        if not self.api_key:
+            raise ValueError("API key not configured. Call the 'configure' method first.")
         # Create the Gemini model instance
+
+
+        if image_paths:
+            model_type = "gemini-pro-vision"
+        else:
+            model_type = "gemini-pro"
+
         self.model = genai.GenerativeModel(
-            model_name="gemini-pro-vision",  # Adapt if using a different model
+            model_name=model_type,  # Adapt if using a different model
             generation_config=self.generation_config,
             safety_settings=self.safety_settings
         )
-
-    def call(self, image_paths: list[str], text_prompt: str) -> str:
-        if not self.api_key:
-            raise ValueError("API key not configured. Call the 'configure' method first.")
-        if not self.model:
-            raise RuntimeError("Gemini model not initialized. Call the 'configure' method first.")
 
         image_parts = []
         for image_path in image_paths:
