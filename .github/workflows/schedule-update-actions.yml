@@ -1,25 +1,26 @@
 name: GitHub Actions Version Updater
 
-# Controls when the action will run.
 on:
   workflow_dispatch:
   schedule:
-    # Automatically run on every Sunday
+    # Automatically run every Sunday at midnight
     - cron:  '0 0 * * 0'
 
 jobs:
-  build:
+  update-actions:
+    name: Update GitHub Actions
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3.5.2
+      - name: Checkout Repository
+        uses: actions/checkout@v3
         with:
-          # [Required] Access token with `workflow` scope.
+          # Use a Personal Access Token (PAT) with 'workflow' scope to authenticate
           token: ${{ secrets.PAT }}
 
-      - name: Run GitHub Actions Version Updater
+      - name: Update GitHub Actions Versions
         uses: saadmk11/github-actions-version-updater@v0.7.4
         with:
-          # [Required] Access token with `workflow` scope.
+          # This Personal Access Token (PAT) must also have 'workflow' scope
           token: ${{ secrets.PAT }}
-          pull_request_title: "ci: Update GitHub Actions to Latest Version"
+          pull_request_title: "ci: Update GitHub Actions to Latest Versions"

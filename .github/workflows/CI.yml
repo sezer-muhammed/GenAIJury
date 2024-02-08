@@ -1,21 +1,35 @@
-name: Python CI
+name: Python CI - Validation
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  release:
-    types: [created]    
   workflow_dispatch:
 
 jobs:
   validation:
-    uses: microsoft/action-python/.github/workflows/validation.yml@0.7.2
-    with:
-      workdir: '.'
+    name: Validate Python Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'  # Adjust this to the version you need
 
-  publish:
-    uses: microsoft/action-python/.github/workflows/publish.yml@0.7.2
-    secrets:
-      PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      TEST_PYPI_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD  }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt  # Adjust this command based on your project setup
+
+      - name: Lint with Flake8
+        run: |
+          pip install flake8
+          flake8 .
+
+      - name: Run tests
+        run: |
+          # Adjust the following commands to fit your testing setup
+          pip install pytest
+          pytest

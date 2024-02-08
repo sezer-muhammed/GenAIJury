@@ -25,5 +25,6 @@
     ],
     "isort.args": [
         "--settings-path=pyproject.toml"
-    ]
+    ],
+    "esbonio.sphinx.confDir": ""
 }
