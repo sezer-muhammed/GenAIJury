@@ -1,44 +1,61 @@
 from genaijury.api_models.base import APIModel
+from genaijury.database.base import DatabaseInterface
 import re
 import json
+from pathlib import Path
+from typing import Dict, List
+
 class JuryModel:
-    def __init__(self, api: APIModel):
+    def __init__(self, api: APIModel, database: DatabaseInterface):
         self.api = api
+        self.database = database  # Database object that implements DatabaseInterface
         self.optimized_prompt = None
-        # ... other Jury model setup ...
 
-    def generate_jury_evaluation(self, criterias: dict, image_paths: list[str] = []) -> dict:
+    def generate_jury_evaluation(self, criterias: Dict, image_paths: List[str] = []) -> Dict:
+        """
+        Generates jury evaluation for a list of image paths based on given criteria.
 
+        Args:
+            criterias (Dict): A dictionary containing the evaluation criteria.
+            image_paths (List[str], optional): A list of image paths to be evaluated. Defaults to [].
+
+        Returns:
+            Dict: A dictionary containing the jury evaluation results for each image path.
+        """
         if not self.optimized_prompt:
             raise ValueError("Optimized preprompt is not set. Please call optimize_prompt() first.")
 
-        # 2. Prompt Construction
-        full_prompt = self.build_jury_prompt(self.optimized_prompt, criterias)
+        jury_evaluation_results = {}
+        for i, image_path in enumerate(image_paths):
+            if not Path(image_path).exists():
+                raise FileNotFoundError(f"Image file not found: {image_path}")
+            full_prompt = self.build_jury_prompt(criterias)
+            response_text = self.api.call(full_prompt, [image_path])
+            # Process the response to extract evaluation
+            jury_evaluation = self.extract_dict(response_text, criterias)
 
-        # 3. Gemini API Call
-        response_text = self.api.call(full_prompt, image_paths)
+            # Add image path as Name field to jury_evaluation before saving
+            jury_evaluation["Name"] = image_path
+            jury_evaluation_results[f"{image_path}_run_{i}"] = jury_evaluation
+            # Save the result into the database
+            self.database.create(jury_evaluation)
 
-        # 4. Response Processing
-        jury_evaluation = self.extract_dict(response_text, criterias)
+        return jury_evaluation_results
 
-        return jury_evaluation
+    def build_jury_prompt(self, criterias: dict) -> str:
+        criterias_str = json.dumps(criterias, ensure_ascii=False, indent=2).encode('utf8')
 
-    def build_jury_prompt(self):
+            # Build the prompt
+        jury_prompt = f"""{self.optimized_prompt}\n\n
+    Here are the criterias for that competition. Fill the given template: {criterias_str}\n\n
+    First write a general analysis of the input, then score each criteria from 0 to 5 in json format.\n
+    Make sure you write whole criterias in code block as json code. do not change structure of json. just fill template\n
+    """
 
-        pass
+        return jury_prompt
 
     def optimize_prompt(self, preprompt: str, criterias: dict) -> str:
-        # Load necessary criteria descriptions or examples
-        criteria_descriptions = criterias["Criterias"]
 
-        prompt_for_guidelines = (
-            f"Act like a jury with Background: {preprompt}. And generate a guideline for scoring given inputs"  # Start with your base preprompt
-            "Provide detailed scoring guideline. "
-            "Include the following:\n"
-            "* A **numerical rating scale** with detailed explanation about scoring system for that topic. Scores are 0 to 5\n"
-            "* **One General Guideline** about how to approach the input based on jury background and user request:\n"
-            "Write general guideline and list points to consider list at least 20 points and write only one guideline and scoring table\n"
-        )
         prompt_for_guidelines = (
             f"You are an expert with background {preprompt} tasked with helping someone create effective scoring guidelines for different input types. Here's how to approach this task:\n"
 
@@ -48,16 +65,16 @@ class JuryModel:
             "   * **Detailed Scoring Table:** Outline a numerical scale (e.g., 0-5). For score level, include: \n"
             "       * **Clear and Short descriptions:** Define what constitutes exceptional (5), good (4), average  (3), etc. \n"
             "       * **Special Conditions:** Identify circumstances that might warrant higher or lower scores within a level.   \n"
-            "Here are Criterias for that competition: \n\n"
         )
         # Add criteria to the prompt
-        for criteria_name, description in criteria_descriptions.items():
-            prompt_for_guidelines += f"  * {criteria_name}: ({description})\n"
+        criterias_str = json.dumps(criterias, ensure_ascii=False).encode('utf8')
+
+        prompt_for_guidelines += f"Here are the criterias for that competition: {criterias_str}\n\n"
 
         # Request clear formatting
         prompt_for_guidelines += "Write your answer in ``` code block ```\n"
 
-        response = self.api.call(prompt_for_guidelines)  # Optional: Use the API to optimize the prompt
+        response = self.api.call(prompt_for_guidelines)
 
         # get text between two ``` marks, in a robust way
         try:
@@ -71,7 +88,7 @@ class JuryModel:
         self.optimized_prompt = optimized_prompt
         return optimized_prompt
 
-    def extract_dict(self, response_text: str) -> dict:
+    def extract_dict(self, response_text: str, criterias: dict) -> dict:
         start_index = response_text.find('{')
         end_index = response_text.rfind('}')
         if start_index == -1 or end_index == -1:

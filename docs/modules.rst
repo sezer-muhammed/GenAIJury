@@ -1,4 +1,4 @@
-src
+genaijury
 ===
 
 .. toctree::
