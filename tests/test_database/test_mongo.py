@@ -27,9 +27,17 @@ skip_if_no_mongo = pytest.mark.skipif(not is_mongo_available(TEST_DB_URI),
 
 
 @pytest.fixture(scope="module")
-@skip_in_github_actions
-@skip_if_no_mongo
 def mongo_interface():
+    # Check if running in GitHub Actions
+    if os.getenv('GITHUB_ACTIONS') == 'true':
+        pytest.skip("Skipping MongoDB tests in GitHub Actions environment")
+
+    # Attempt to connect to MongoDB to check availability
+    try:
+        client = MongoClient(TEST_DB_URI, serverSelectionTimeoutMS=1000)  # Adjust timeout as needed
+        client.admin.command('ping')
+    except ServerSelectionTimeoutError:
+        pytest.skip("MongoDB not available")
     # Setup MongoDB interface for testing
     interface = MongoDBInterface(TEST_DB_URI, TEST_DB_NAME, TEST_COLLECTION_NAME)
     yield interface
