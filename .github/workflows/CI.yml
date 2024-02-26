@@ -23,6 +23,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt  # Adjust this command based on your project setup
 
+      - name: Install Project in Editable Mode
+        run: |
+          pip install -e .
+
       - name: Run tests
         run: |
           # Adjust the following commands to fit your testing setup
