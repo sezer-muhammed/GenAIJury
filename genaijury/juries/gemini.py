@@ -47,9 +47,9 @@ class JuryModel:
 
             # Build the prompt
         jury_prompt = f"""{self.optimized_prompt}\n\n
-    Here are the criterias for that competition. Fill the given template: {criterias_str}\n\n
+    Here are the criterias for that competition. Fill the given json template: {criterias_str}\n\n
     First write a general analysis of the input, then score each criteria from 0 to 5 in json format.\n
-    Make sure you write whole criterias in code block as json code. do not change structure of json. just fill template\n
+    Make sure you write whole criterias in code block as json code. do not change structure of json. just fill the json template\n
     """
 
         return jury_prompt
@@ -59,7 +59,7 @@ class JuryModel:
         prompt_for_guidelines = (
             f"You are an expert with background {preprompt} tasked with helping someone create effective scoring guidelines for different input types. Here's how to approach this task:\n"
 
-            "**. Develop a Tailored Prompt:** Provide the user with a new prompt template suitable for their input type. Include:\n"
+            "**. Develop a Prompt:** Provide the user with a new prompt template suitable for their input type. Include:\n"
             "   * **Instructions:** Clear and SHORT guidance on how to use the guidelines to evaluate submissions. Consider background information of the jury\n"
             "   * **Avoid Repetitive words**: Do not repeat same words along prompt. **\n"
             "   * **Detailed Scoring Table:** Outline a numerical scale (e.g., 0-5). For score level, include: \n"

@@ -11,7 +11,7 @@ class GeminiAPIModel(APIModel):
             "temperature": 0.35,
             "top_p": 1,
             "top_k": 32,
-            "max_output_tokens": 16000,
+            "max_output_tokens": 20000,
         }
         self.safety_settings = [
         {
@@ -34,17 +34,27 @@ class GeminiAPIModel(APIModel):
 
 
     def configure(self, api_key: str, **config):
-        self.api_key = api_key
-        genai.configure(api_key=self.api_key)  # Initialize the library
+            """
+            Configures the Gemini API client with the provided API key and optional additional configuration.
 
-        # Update configuration if provided
-        if config:
-            if 'generation_config' in config:
-                self.generation_config = config['generation_config']
-            if 'safety_settings' in config:
-                self.safety_settings = config['safety_settings']
+            Args:
+                api_key (str): The API key to authenticate the client.
+                **config: Additional configuration options. Can include 'generation_config' and 'safety_settings'.
 
-        return self
+            Returns:
+                self: The configured Gemini API client instance.
+            """
+            self.api_key = api_key
+            genai.configure(api_key=self.api_key)  # Initialize the library
+
+            # Update configuration if provided
+            if config:
+                if 'generation_config' in config:
+                    self.generation_config = config['generation_config']
+                if 'safety_settings' in config:
+                    self.safety_settings = config['safety_settings']
+
+            return self
 
     def call(self, text_prompt: str, image_paths: list[str] = []) -> str:
         if not self.api_key:
@@ -53,11 +63,11 @@ class GeminiAPIModel(APIModel):
 
 
         if image_paths:
-            model_type = "gemini-pro-vision"
+            model_type = "gemini-1.0-pro-vision-latest"
         else:
-            model_type = "gemini-pro"
+            model_type = "gemini-1.0-pro"
 
-        self.model = genai.GenerativeModel(
+        model = genai.GenerativeModel(
             model_name=model_type,  # Adapt if using a different model
             generation_config=self.generation_config,
             safety_settings=self.safety_settings
@@ -79,7 +89,7 @@ class GeminiAPIModel(APIModel):
         ]
 
         try:
-            response = self.model.generate_content(prompt_parts)
+            response = model.generate_content(prompt_parts)
             return response.text
         except Exception as e:
             raise RuntimeError(f"Gemini API call failed: {e}")
