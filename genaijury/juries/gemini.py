@@ -27,20 +27,31 @@ class JuryModel:
 
         jury_evaluation_results = {}
         for i, submission in enumerate(submissions):
-            if not Path(submission).exists():
-                full_prompt = self.build_jury_prompt(criterias, submission)
-                response_text = self.api.call(full_prompt)
-            else:
-                full_prompt = self.build_jury_prompt(criterias)
-                response_text = self.api.call(full_prompt, [submission])
-            # Process the response to extract evaluation
-            jury_evaluation = self.extract_dict(response_text)
+            max_attempts = 5
+            attempts = 0
+            jury_evaluation = None
+            while attempts < max_attempts:
+                attempts += 1
+                try:
+                    if not Path(submission).exists():
+                        full_prompt = self.build_jury_prompt(criterias, submission)
+                        response_text = self.api.call(full_prompt)
 
-            # Add image path as Name field to jury_evaluation before saving
-            jury_evaluation["Name"] = submission
-            jury_evaluation_results[f"{submission}_run_{i}"] = jury_evaluation
-            # Save the result into the database
-            self.database.create(jury_evaluation)
+                    else:
+                        full_prompt = self.build_jury_prompt(criterias)
+                        response_text = self.api.call(full_prompt, [submission])
+                    # Process the response to extract evaluation
+
+                    jury_evaluation = self.extract_dict(response_text)
+
+                    # Add image path as Name field to jury_evaluation before saving
+                    jury_evaluation["Name"] = submission
+                    jury_evaluation_results[f"{submission}_run_{i}"] = jury_evaluation
+                    # Save the result into the database
+                    self.database.create(jury_evaluation)
+                    break
+                except:
+                    pass
 
         return jury_evaluation_results
 
