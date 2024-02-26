@@ -11,7 +11,7 @@ class JuryModel:
         self.database = database  # Database object that implements DatabaseInterface
         self.optimized_prompt = None
 
-    def generate_jury_evaluation(self, criterias: Dict, image_paths: List[str] = []) -> Dict:
+    def generate_jury_evaluation(self, criterias: Dict, submissions: List[str] = []) -> Dict:
         """
         Generates jury evaluation for a list of image paths based on given criteria.
 
@@ -26,23 +26,25 @@ class JuryModel:
             raise ValueError("Optimized preprompt is not set. Please call optimize_prompt() first.")
 
         jury_evaluation_results = {}
-        for i, image_path in enumerate(image_paths):
-            if not Path(image_path).exists():
-                raise FileNotFoundError(f"Image file not found: {image_path}")
-            full_prompt = self.build_jury_prompt(criterias)
-            response_text = self.api.call(full_prompt, [image_path])
+        for i, submission in enumerate(submissions):
+            if not Path(submission).exists():
+                full_prompt = self.build_jury_prompt(criterias, submission)
+                response_text = self.api.call(full_prompt)
+            else:
+                full_prompt = self.build_jury_prompt(criterias)
+                response_text = self.api.call(full_prompt, [submission])
             # Process the response to extract evaluation
-            jury_evaluation = self.extract_dict(response_text, criterias)
+            jury_evaluation = self.extract_dict(response_text)
 
             # Add image path as Name field to jury_evaluation before saving
-            jury_evaluation["Name"] = image_path
-            jury_evaluation_results[f"{image_path}_run_{i}"] = jury_evaluation
+            jury_evaluation["Name"] = submission
+            jury_evaluation_results[f"{submission}_run_{i}"] = jury_evaluation
             # Save the result into the database
             self.database.create(jury_evaluation)
 
         return jury_evaluation_results
 
-    def build_jury_prompt(self, criterias: dict) -> str:
+    def build_jury_prompt(self, criterias: dict, submission: str = None) -> str:
         criterias_str = json.dumps(criterias, ensure_ascii=False, indent=2).encode('utf8')
 
             # Build the prompt
@@ -52,20 +54,24 @@ class JuryModel:
     Make sure you write whole criterias in code block as json code. do not change structure of json. just fill the json template\n
     """
 
+        if submission:
+            jury_prompt += f"Here is the submission: {submission}\n\n"
+
         return jury_prompt
 
     def optimize_prompt(self, preprompt: str, criterias: dict) -> str:
 
         prompt_for_guidelines = (
-            f"You are an expert with background {preprompt} tasked with helping someone create effective scoring guidelines for different input types. Here's how to approach this task:\n"
-
-            "**. Develop a Prompt:** Provide the user with a new prompt template suitable for their input type. Include:\n"
-            "   * **Instructions:** Clear and SHORT guidance on how to use the guidelines to evaluate submissions. Consider background information of the jury\n"
-            "   * **Avoid Repetitive words**: Do not repeat same words along prompt. **\n"
-            "   * **Detailed Scoring Table:** Outline a numerical scale (e.g., 0-5). For score level, include: \n"
-            "       * **Clear and Short descriptions:** Define what constitutes exceptional (5), good (4), average  (3), etc. \n"
-            "       * **Special Conditions:** Identify circumstances that might warrant higher or lower scores within a level.   \n"
+            f"You are an expert with a background in {preprompt}, tasked with assisting in the creation of effective scoring guidelines for different input types. Approach this task as follows:\n"
+            "\n"
+            "- Develop a Guide: Craft a new Scoring Guide template including:\n"
+            "   - Instructions: Provide clear, brief guidance on using the guidelines to assess submissions, taking into account the jurors' background knowledge.\n"
+            "   - Detailed and Short Scoring Criteria: Present a numerical scale (e.g., 0-5) and for each score level, detail:\n"
+            "       - Clear, short, concise descriptions: Describe what qualifies as exceptional (5), good (4), average (3), and so on.\n"
+            "       - Special Conditions: Highlight any circumstances that may justify deviations from the typical score range.\n"
+            "       - Only and Only write scoring guides for the given criterias below.\n"
         )
+
         # Add criteria to the prompt
         criterias_str = json.dumps(criterias, ensure_ascii=False).encode('utf8')
 
@@ -74,21 +80,34 @@ class JuryModel:
         # Request clear formatting
         prompt_for_guidelines += "Write your answer in ``` code block ```\n"
 
-        response = self.api.call(prompt_for_guidelines)
+        max_attempts = 5  # Set a maximum number of attempts to prevent infinite loops
+        attempts = 0
 
-        # get text between two ``` marks, in a robust way
-        try:
-            optimized_prompt = response.split("```")[1]
-        except Exception as e:
-            optimized_prompt = response
+        while attempts < max_attempts:
+            attempts += 1
 
-        with open("optimized_prompt.txt", "w") as file:
-            file.write(optimized_prompt)
+            try:
+                response = self.api.call(prompt_for_guidelines)
+                # Attempt to extract the text between triple backticks
+                if "```" in response:
+                    optimized_prompt = response.split("```")[1]
+                    break  # Exit the loop if the optimized prompt is successfully extracted
+                else:
+                    optimized_prompt = None
+            except Exception as e:
+                optimized_prompt = None
+
+            if attempts == max_attempts:
+                optimized_prompt = None  # Use the last response received if max attempts are reached
+
+        # Ensure optimized_prompt is set to response if no backticks were found after all attempts
+        if optimized_prompt is None:
+            raise ValueError("Failed to extract optimized prompt from response.")
 
         self.optimized_prompt = optimized_prompt
         return optimized_prompt
 
-    def extract_dict(self, response_text: str, criterias: dict) -> dict:
+    def extract_dict(self, response_text: str) -> dict:
         start_index = response_text.find('{')
         end_index = response_text.rfind('}')
         if start_index == -1 or end_index == -1:
